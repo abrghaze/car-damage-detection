@@ -1,77 +1,110 @@
+"""
+Car Damage Detection - COCO to YOLO Converter
+Converts COCO format annotations to YOLO segmentation format
+"""
+
 import os
 import json
 from pathlib import Path
 from tqdm import tqdm
 
-# === CONFIGURATION ===
-dataset_path = Path("../CarDataTot/data_coco")  # depuis scripts/
-json_files = {
-    "train": dataset_path / "annotations" / "instances_train2017.json",
-    "val": dataset_path / "annotations" / "instances_val2017.json"
-}
-images_folders = {
-    "train": dataset_path / "images" / "train",
-    "val": dataset_path / "images" / "val"
-}
-labels_folders = {
-    "train": dataset_path / "labels" / "train",
-    "val": dataset_path / "labels" / "val"
+
+# ============== CONFIGURATION ==============
+# Dataset path - UPDATE THIS TO YOUR DATASET LOCATION
+DATASET_PATH = Path(r"C:\Users\Lenovo\Documents\documnta\PFA\car damage\CarDataTot\data_coco")
+
+# Annotation files
+ANNOTATIONS = {
+    "train": DATASET_PATH / "annotations" / "instances_train2017.json",
+    "val": DATASET_PATH / "annotations" / "instances_val2017.json"
 }
 
-# === CONVERSION FONCTION ===
-def convert_coco_to_yolo_seg(json_path, images_dir, labels_dir):
-    print(f"Converting {json_path.name}...")
+# Output label directories
+LABELS_OUTPUT = {
+    "train": DATASET_PATH / "labels" / "train",
+    "val": DATASET_PATH / "labels" / "val"
+}
+
+
+def convert_coco_to_yolo(json_path, labels_dir):
+    """Convert a COCO annotation file to YOLO segmentation format."""
+    
+    print(f"\n📄 Converting: {json_path.name}")
+    
+    if not json_path.exists():
+        print(f"   ⚠️ File not found: {json_path}")
+        return
+    
     with open(json_path, 'r') as f:
-        coco_data = json.load(f)
-
-    os.makedirs(labels_dir, exist_ok=True)
-
-    # map des catégories
-    categories = {cat["id"]: idx for idx, cat in enumerate(coco_data["categories"])}
-
-    # regrouper annotations par image_id
-    annotations_by_image = {}
-    for ann in coco_data["annotations"]:
-        if ann["iscrowd"] == 1 or "segmentation" not in ann or not ann["segmentation"]:
+        coco = json.load(f)
+    
+    labels_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Category mapping
+    categories = {cat["id"]: idx for idx, cat in enumerate(coco["categories"])}
+    
+    # Print classes
+    print(f"   Classes: {[cat['name'] for cat in coco['categories']]}")
+    
+    # Group annotations by image
+    anns_by_image = {}
+    for ann in coco["annotations"]:
+        if ann.get("iscrowd", 0) == 1:
             continue
-        image_id = ann["image_id"]
-        if image_id not in annotations_by_image:
-            annotations_by_image[image_id] = []
-        annotations_by_image[image_id].append(ann)
-
-    # traitement images
-    for image_info in tqdm(coco_data["images"]):
-        image_id = image_info["id"]
-        file_name = Path(image_info["file_name"]).stem
-        width = image_info["width"]
-        height = image_info["height"]
-        label_path = labels_dir / f"{file_name}.txt"
-
-        anns = annotations_by_image.get(image_id, [])
+        if "segmentation" not in ann or not ann["segmentation"]:
+            continue
+        
+        img_id = ann["image_id"]
+        if img_id not in anns_by_image:
+            anns_by_image[img_id] = []
+        anns_by_image[img_id].append(ann)
+    
+    # Process each image
+    converted = 0
+    for img_info in tqdm(coco["images"], desc="   Processing"):
+        img_id = img_info["id"]
+        file_name = Path(img_info["file_name"]).stem
+        width = img_info["width"]
+        height = img_info["height"]
+        
+        anns = anns_by_image.get(img_id, [])
         if not anns:
             continue
-
+        
+        label_path = labels_dir / f"{file_name}.txt"
+        
         with open(label_path, 'w') as f:
             for ann in anns:
-                category_id = ann["category_id"]
-                class_id = categories[category_id]
-                segmentation = ann["segmentation"]
-
-                for seg in segmentation:
-                    norm_seg = []
+                class_id = categories[ann["category_id"]]
+                
+                for seg in ann["segmentation"]:
+                    # Normalize coordinates
+                    points = []
                     for i in range(0, len(seg), 2):
                         x = seg[i] / width
                         y = seg[i+1] / height
-                        norm_seg.extend([x, y])
-                    norm_seg = ' '.join([f"{p:.6f}" for p in norm_seg])
-                    f.write(f"{class_id} {norm_seg}\n")
+                        points.extend([x, y])
+                    
+                    points_str = ' '.join([f"{p:.6f}" for p in points])
+                    f.write(f"{class_id} {points_str}\n")
+        
+        converted += 1
+    
+    print(f"   ✅ Converted {converted} images")
 
-# === LANCEMENT ===
-for split in ["train", "val"]:
-    convert_coco_to_yolo_seg(
-        json_path=json_files[split],
-        images_dir=images_folders[split],
-        labels_dir=labels_folders[split]
-    )
 
-print("✅ Conversion terminée. Tu peux maintenant lancer l'entraînement YOLOv8.")
+def convert_all():
+    """Convert all annotation files."""
+    print("=" * 50)
+    print("🔄 COCO TO YOLO CONVERTER")
+    print("=" * 50)
+    
+    for split in ["train", "val"]:
+        convert_coco_to_yolo(ANNOTATIONS[split], LABELS_OUTPUT[split])
+    
+    print("\n✅ Conversion complete!")
+    print(f"   Labels saved to: {DATASET_PATH / 'labels'}")
+
+
+if __name__ == "__main__":
+    convert_all()

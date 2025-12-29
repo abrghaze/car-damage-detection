@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# YOLO
+*.pt
+!models/yolo_weights/best.pt
+runs/
+scripts/runs/
+app/runs/
+
+# Node.js
+node_modules/
+frontend/node_modules/
+.npm
+
+# Build outputs
+frontend/dist/
+
+# Uploads and results
+backend/uploads/
+backend/results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test outputs
+fallback_mask.png
